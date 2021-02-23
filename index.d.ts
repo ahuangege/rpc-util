@@ -1,6 +1,10 @@
 
+/** set logger cb */
+export function setLogger(cb: (level: "info" | "warn" | "error", msg: string) => void): void;
+
 /** create server */
 export function rpcServer(config: I_rpcUtil_serverConfig, msgHandler: { [file: string]: any }): I_rpcUtil_server;
+
 /** create client */
 export function rpcClient(config: I_rpcUtil_clientConfig, msgHandler: { [file: string]: any }): I_rpcUtil_client;
 
@@ -23,6 +27,7 @@ interface I_rpcUtil_serverConfig {
 interface I_rpcUtil_server {
     rpc: (id: number | string, cmd: string) => Function;
     delOne(id: number | string): void;
+    on(event: "onAdd" | "onDel", listener: (id: number | string) => void);
 }
 
 interface I_rpcUtil_clientConfig {
@@ -44,5 +49,6 @@ interface I_rpcUtil_client {
     rpc: (id: number | string, cmd: string) => Function;
     addOne(server: { "id": number | string, "host": string, "port": number }): void;
     delOne(id: number | string): void;
+    on(event: "onAdd" | "onDel", listener: (id: number | string) => void);
 }
 

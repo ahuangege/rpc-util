@@ -1,3 +1,4 @@
+import { getLogger } from "../rpcUtil";
 import { rpcErr, I_rpcMsg, I_rpcTimeout, Rpc_Msg } from "./util";
 
 export interface I_rpc_sc {
@@ -187,7 +188,7 @@ export class RpcService {
         try {
             cb(rpcErr.timeout);
         } catch (e) {
-            console.error(e.stack);
+            getLogger()("error", e.stack);
         }
     }
 

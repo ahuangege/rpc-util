@@ -7,7 +7,7 @@ a typescript rpc framework
 # usage
 
 ```
-import * as rpc_utl from "rpc-util";
+import * as rpcUtl from "rpc-util";
 
 class ServerHandler {
     test(a: number, b: string, cb: (err: number, data: any) => void) {
@@ -21,8 +21,12 @@ class ClientHandler {
     }
 }
 
-let server = rpc_utl.rpcServer({ "id": "center svr", "port": 3001 }, { "mainSvr": new ServerHandler() });
-let client = rpc_utl.rpcClient({ "id": "gameSvr1", "serverList": [{ "id": "hallSvr", "host": "127.0.0.1", "port": 3001 }] }, { "mainClient": new ClientHandler() });
+rpcUtl.setLogger((level, msg) => {
+    console.log(" *** ", level, msg)
+});
+
+let server = rpcUtl.rpcServer({ "id": "hallSvr", "port": 3001 }, { "mainSvr": new ServerHandler() });
+let client = rpcUtl.rpcClient({ "id": "gameSvr1", "serverList": [{ "id": "hallSvr", "host": "127.0.0.1", "port": 3001 }] }, { "mainClient": new ClientHandler() });
 
 setTimeout(Test, 1000);
 

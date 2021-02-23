@@ -1,6 +1,8 @@
+import { getLogger } from "./rpcUtil";
 import { I_rpc_sc, RpcService } from "./util/rpcService";
 import { TcpClient } from "./util/tcpClient";
 import { Rpc_Msg, SocketProxy, some_config } from "./util/util";
+import { EventEmitter } from "events";
 
 export interface I_RpcClientConfig {
     "id": number | string,
@@ -12,7 +14,7 @@ export interface I_RpcClientConfig {
 }
 
 
-export class RpcClient implements I_rpc_sc {
+export class RpcClient extends EventEmitter implements I_rpc_sc {
     config: I_RpcClientConfig;
     sockets: { [id: string]: RpcClientSocket } = {};
     rpc: (id: string, cmd: string) => Function = null as any;
@@ -20,6 +22,7 @@ export class RpcClient implements I_rpc_sc {
     msgHandler: { [file: string]: any };
     allSockets: { [id: string]: RpcClientSocket } = {};
     constructor(config: I_RpcClientConfig, msgHandler: { [file: string]: any }) {
+        super();
         this.config = config;
         this.msgHandler = msgHandler;
         this.rpcService = new RpcService(config.timeout || 0, this);
@@ -58,11 +61,11 @@ export class RpcClientSocket {
 
     constructor(rpcClient: RpcClient, server: { "id": number | string, "host": string, "port": number }) {
         this.rpcClient = rpcClient;
-        this.id = server.id.toString();
+        this.id = server.id as any;
         this.host = server.host;
         this.port = server.port;
         if (this.rpcClient.allSockets[this.id]) {
-            console.error(`rpcUtil_client --> [${this.rpcClient.config.id}] already has rpc server named [${this.id}]`);
+            getLogger()("error", `rpcUtil_client --> [${this.rpcClient.config.id}] already has rpc server named [${this.id}]`);
             return;
         }
 
@@ -98,14 +101,17 @@ export class RpcClientSocket {
 
 
     private onClose() {
-        delete this.rpcClient.sockets[this.id];
         clearTimeout(this.heartbeatTimer);
         clearTimeout(this.heartbeatTimeoutTimer);
         this.heartbeatTimeoutTimer = null as any;
         this.socket = null as any;
         if (!this.die) {
-            console.warn(`rpcUtil_client --> [${this.rpcClient.config.id}] socket closed, reconnect the rpc server later: ${this.id}`);
+            getLogger()("warn", `rpcUtil_client --> [${this.rpcClient.config.id}] socket closed, reconnect the rpc server later: ${this.id}`);
             this.doConnect(some_config.Time.Rpc_Reconnect_Time * 1000);
+        }
+        if (this.rpcClient.sockets[this.id]) {
+            delete this.rpcClient.sockets[this.id];
+            this.rpcClient.emit("onDel", this.id);
         }
     }
 
@@ -146,7 +152,7 @@ export class RpcClientSocket {
         }
         this.heartbeatTimeoutTimer = setTimeout(() => {
             this.socket.close();
-            console.warn(`rpcUtil_client --> [${this.rpcClient.config.id}] heartbeat timeout, close the socket: ${this.id}`);
+            getLogger()("warn", `rpcUtil_client --> [${this.rpcClient.config.id}] heartbeat timeout, close the socket: ${this.id}`);
         }, some_config.Time.Rpc_Heart_Beat_Timeout_Time * 1000);
 
     }
@@ -166,7 +172,7 @@ export class RpcClientSocket {
                 this.close(false);
             }
         } catch (e) {
-            console.error(`[${this.rpcClient.config.id}]`, e.stack);
+            getLogger()("error", `[${this.rpcClient.config.id}] ` + e.stack);
         }
     }
 
@@ -176,7 +182,8 @@ export class RpcClientSocket {
     private registerHandle() {
         this.heartbeatSend();
         this.rpcClient.sockets[this.id] = this;
-        console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] connect rpc server ok [${this.id}]`);
+        getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] connect rpc server ok [${this.id}]`);
+        this.rpcClient.emit("onAdd", this.id);
     }
 
 
@@ -195,9 +202,9 @@ export class RpcClientSocket {
         }
         clearTimeout(this.connectTimeout);
         if (byUser) {
-            console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed ok [${this.id}]`);
+            getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed ok [${this.id}]`);
         } else {
-            console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed by rpc server ok [${this.id}]`);
+            getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed by rpc server ok [${this.id}]`);
         }
     }
 }

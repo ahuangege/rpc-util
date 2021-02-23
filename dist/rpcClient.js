@@ -1,11 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RpcClientSocket = exports.RpcClient = void 0;
+const rpcUtil_1 = require("./rpcUtil");
 const rpcService_1 = require("./util/rpcService");
 const tcpClient_1 = require("./util/tcpClient");
 const util_1 = require("./util/util");
-class RpcClient {
+const events_1 = require("events");
+class RpcClient extends events_1.EventEmitter {
     constructor(config, msgHandler) {
+        super();
         this.sockets = {};
         this.rpc = null;
         this.allSockets = {};
@@ -35,11 +38,11 @@ class RpcClientSocket {
         this.heartbeatTimeoutTimer = null;
         this.connectTimeout = null;
         this.rpcClient = rpcClient;
-        this.id = server.id.toString();
+        this.id = server.id;
         this.host = server.host;
         this.port = server.port;
         if (this.rpcClient.allSockets[this.id]) {
-            console.error(`rpcUtil_client --> [${this.rpcClient.config.id}] already has rpc server named [${this.id}]`);
+            rpcUtil_1.getLogger()("error", `rpcUtil_client --> [${this.rpcClient.config.id}] already has rpc server named [${this.id}]`);
             return;
         }
         this.rpcClient.allSockets[this.id] = this;
@@ -70,14 +73,17 @@ class RpcClientSocket {
         }, delay);
     }
     onClose() {
-        delete this.rpcClient.sockets[this.id];
         clearTimeout(this.heartbeatTimer);
         clearTimeout(this.heartbeatTimeoutTimer);
         this.heartbeatTimeoutTimer = null;
         this.socket = null;
         if (!this.die) {
-            console.warn(`rpcUtil_client --> [${this.rpcClient.config.id}] socket closed, reconnect the rpc server later: ${this.id}`);
+            rpcUtil_1.getLogger()("warn", `rpcUtil_client --> [${this.rpcClient.config.id}] socket closed, reconnect the rpc server later: ${this.id}`);
             this.doConnect(util_1.some_config.Time.Rpc_Reconnect_Time * 1000);
+        }
+        if (this.rpcClient.sockets[this.id]) {
+            delete this.rpcClient.sockets[this.id];
+            this.rpcClient.emit("onDel", this.id);
         }
     }
     /**
@@ -115,7 +121,7 @@ class RpcClientSocket {
         }
         this.heartbeatTimeoutTimer = setTimeout(() => {
             this.socket.close();
-            console.warn(`rpcUtil_client --> [${this.rpcClient.config.id}] heartbeat timeout, close the socket: ${this.id}`);
+            rpcUtil_1.getLogger()("warn", `rpcUtil_client --> [${this.rpcClient.config.id}] heartbeat timeout, close the socket: ${this.id}`);
         }, util_1.some_config.Time.Rpc_Heart_Beat_Timeout_Time * 1000);
     }
     onData(data) {
@@ -135,7 +141,7 @@ class RpcClientSocket {
             }
         }
         catch (e) {
-            console.error(`[${this.rpcClient.config.id}]`, e.stack);
+            rpcUtil_1.getLogger()("error", `[${this.rpcClient.config.id}] ` + e.stack);
         }
     }
     /**
@@ -144,7 +150,8 @@ class RpcClientSocket {
     registerHandle() {
         this.heartbeatSend();
         this.rpcClient.sockets[this.id] = this;
-        console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] connect rpc server ok [${this.id}]`);
+        rpcUtil_1.getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] connect rpc server ok [${this.id}]`);
+        this.rpcClient.emit("onAdd", this.id);
     }
     send(data) {
         this.socket.send(data);
@@ -160,10 +167,10 @@ class RpcClientSocket {
         }
         clearTimeout(this.connectTimeout);
         if (byUser) {
-            console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed ok [${this.id}]`);
+            rpcUtil_1.getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed ok [${this.id}]`);
         }
         else {
-            console.info(`rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed by rpc server ok [${this.id}]`);
+            rpcUtil_1.getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] rpc socket be closed by rpc server ok [${this.id}]`);
         }
     }
 }

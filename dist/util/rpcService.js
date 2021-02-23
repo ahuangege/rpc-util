@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RpcService = void 0;
+const rpcUtil_1 = require("../rpcUtil");
 /**
  * rpc代理
  */
@@ -163,7 +164,7 @@ class RpcService {
             cb(2 /* timeout */);
         }
         catch (e) {
-            console.error(e.stack);
+            rpcUtil_1.getLogger()("error", e.stack);
         }
     }
     /**
