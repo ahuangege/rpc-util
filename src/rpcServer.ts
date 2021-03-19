@@ -11,6 +11,7 @@ export interface I_RpcServerConfig {
     "timeout"?: number,
     "maxLen"?: number,
     "heartbeat"?: number,
+    "interval"?: number,
 }
 
 export class RpcServer extends EventEmitter implements I_rpc_sc {
@@ -19,10 +20,16 @@ export class RpcServer extends EventEmitter implements I_rpc_sc {
     rpc: (id: string, cmd: string) => Function = null as any;
     rpcService: RpcService;
     msgHandler: { [file: string]: any };
+    sendCache: boolean = false;
+    sendInterval: number = 0;
     constructor(config: I_RpcServerConfig, msgHandler: { [file: string]: any }) {
         super();
         this.config = config;
         this.msgHandler = msgHandler;
+        if (config.interval && config.interval >= 10) {
+            this.sendCache = true;
+            this.sendInterval = config.interval;
+        }
         this.rpcService = new RpcService(config.timeout || 0, this);
 
         tcpServer(config.port
@@ -51,6 +58,10 @@ class RpcServerSocket {
     private socket: SocketProxy;
     private die = false;
 
+    private sendCache: boolean = false;
+    private sendArr: Buffer[] = [];
+    private sendTimer: NodeJS.Timer = null as any;
+
     private registerTimer: NodeJS.Timeout = null as any;
     private heartbeatTimer: NodeJS.Timeout = null as any;
     constructor(rpcServer: RpcServer, socket: SocketProxy) {
@@ -62,6 +73,7 @@ class RpcServerSocket {
             getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] register timeout, close the socket: ${socket.remoteAddress}`);
             socket.close();
         }, 5000);
+        this.sendCache = this.rpcServer.sendCache;
     }
 
     // 首条消息是注册
@@ -109,6 +121,7 @@ class RpcServerSocket {
     private onClose() {
         clearTimeout(this.registerTimer);
         clearTimeout(this.heartbeatTimer);
+        clearInterval(this.sendTimer);
         if (this.rpcServer.sockets[this.id]) {
             delete this.rpcServer.sockets[this.id];
             this.rpcServer.emit("onDel", this.id);
@@ -149,6 +162,10 @@ class RpcServerSocket {
         this.rpcServer.sockets[this.id] = this;
         this.registerTimer = null as any;
 
+        if (this.sendCache) {
+            this.sendTimer = setInterval(this.sendInterval.bind(this), this.rpcServer.sendInterval);
+        }
+
         getLogger()("info", `rpcUtil_server --> [${this.rpcServer.config.id}] get new rpc client named: ${this.id}`);
 
         // 注册成功，回应
@@ -187,7 +204,18 @@ class RpcServerSocket {
     }
 
     send(data: Buffer) {
-        this.socket.send(data);
+        if (this.sendCache) {
+            this.sendArr.push(data);
+        } else {
+            this.socket.send(data);
+        }
+    }
+
+    private sendInterval() {
+        if (this.sendArr.length > 0) {
+            this.socket.send(Buffer.concat(this.sendArr));
+            this.sendArr.length = 0;
+        }
     }
 
     close() {

@@ -11,6 +11,7 @@ export interface I_RpcClientConfig {
     "timeout"?: number,
     "maxLen"?: number,
     "heartbeat"?: number,
+    "interval"?: number,
 }
 
 
@@ -55,6 +56,10 @@ export class RpcClientSocket {
     private socket: SocketProxy = null as any;
     private die = false;
 
+    private sendCache: boolean = false;
+    private sendArr: Buffer[] = [];
+    private sendTimer: NodeJS.Timer = null as any;
+
     private heartbeatTimer: NodeJS.Timer = null as any;
     private heartbeatTimeoutTimer: NodeJS.Timer = null as any;
     private connectTimeout: NodeJS.Timeout = null as any;
@@ -70,6 +75,11 @@ export class RpcClientSocket {
         }
 
         this.rpcClient.allSockets[this.id] = this;
+
+        let interval = this.rpcClient.config.interval;
+        if (interval && interval >= 10) {
+            this.sendCache = true;
+        }
 
         this.doConnect(0);
     }
@@ -103,6 +113,7 @@ export class RpcClientSocket {
     private onClose() {
         clearTimeout(this.heartbeatTimer);
         clearTimeout(this.heartbeatTimeoutTimer);
+        clearInterval(this.sendTimer);
         this.heartbeatTimeoutTimer = null as any;
         this.socket = null as any;
         if (!this.die) {
@@ -182,15 +193,28 @@ export class RpcClientSocket {
     private registerHandle() {
         this.heartbeatSend();
         this.rpcClient.sockets[this.id] = this;
+        if (this.sendCache) {
+            this.sendTimer = setInterval(this.sendInterval.bind(this), this.rpcClient.config.interval) as any;
+        }
         getLogger()("info", `rpcUtil_client --> [${this.rpcClient.config.id}] connect rpc server ok [${this.id}]`);
         this.rpcClient.emit("onAdd", this.id);
     }
 
 
     send(data: Buffer) {
-        this.socket.send(data);
+        if (this.sendCache) {
+            this.sendArr.push(data);
+        } else {
+            this.socket.send(data);
+        }
     }
 
+    private sendInterval() {
+        if (this.sendArr.length > 0) {
+            this.socket.send(Buffer.concat(this.sendArr));
+            this.sendArr.length = 0;
+        }
+    }
     close(byUser: boolean) {
         if (this.die) {
             return;

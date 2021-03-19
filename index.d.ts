@@ -22,6 +22,8 @@ interface I_rpcUtil_serverConfig {
     "maxLen"?: number,
     /** heartbeat (seconds, use more than 5, default 60) */
     "heartbeat"?: number,
+    /** message sending frequency (ms, more than 10 is enabled, the default is to send immediately) */
+    "interval"?: number,
 }
 
 interface I_rpcUtil_server {
@@ -43,6 +45,8 @@ interface I_rpcUtil_clientConfig {
     "maxLen"?: number,
     /** heartbeat (seconds, use more than 5, default 60) */
     "heartbeat"?: number,
+    /** message sending frequency (ms, more than 10 is enabled, the default is to send immediately) */
+    "interval"?: number,
 }
 
 interface I_rpcUtil_client {
