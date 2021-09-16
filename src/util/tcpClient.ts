@@ -14,15 +14,17 @@ export class TcpClient extends EventEmitter implements SocketProxy {
     socket: net.Socket;
     maxLen: number;
     len: number = 0;
-    buffer: Buffer = Buffer.allocUnsafe(0);
+    buffer: Buffer = null as any;
+    headLen = 0;
+    headBuf = Buffer.alloc(4);
 
-    constructor(port: number, host: string, maxLen: number, connectCb: () => void) {
+    constructor(port: number, host: string, maxLen: number, noDelay: boolean, connectCb: () => void) {
         super();
         this.socket = net.connect(port, host, () => {
             this.remoteAddress = this.socket.remoteAddress as string;
             connectCb();
         });
-        this.socket.setNoDelay(true);
+        this.socket.setNoDelay(noDelay);
         this.maxLen = maxLen;
         this.socket.on("close", (err) => {
             if (!this.die) {
@@ -37,11 +39,7 @@ export class TcpClient extends EventEmitter implements SocketProxy {
             }
         });
         this.socket.on("data", (data) => {
-            if (!this.die) {
-                decode(this, data);
-            } else {
-                this.close();
-            }
+            decode(this, data);
         });
     }
 

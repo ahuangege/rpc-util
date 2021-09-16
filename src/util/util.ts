@@ -10,6 +10,8 @@ export interface SocketProxy extends EventEmitter {
     maxLen: number;
     len: number;
     buffer: Buffer;
+    headLen: number;
+    headBuf: Buffer;
     close(): void;
     send(data: Buffer): void;
 }
@@ -21,19 +23,27 @@ export interface SocketProxy extends EventEmitter {
 export function decode(socket: SocketProxy, msg: Buffer) {
     let readLen = 0;
     while (readLen < msg.length) {
-        if (socket.len === 0) //data length is unknown
+        if (socket.len === 0) // data length is unknown
         {
-            socket.buffer = Buffer.concat([socket.buffer, Buffer.from([msg[readLen]])]);
-            if (socket.buffer.length === 4) {
-                socket.len = socket.buffer.readUInt32BE(0);
+            socket.headBuf[socket.headLen] = msg[readLen];
+            socket.headLen++;
+            readLen++;
+            if (socket.headLen === 4) {
+                socket.len = socket.headBuf.readUInt32BE(0);
                 if (socket.len > socket.maxLen || socket.len === 0) {
                     socket.close();
                     throw new Error("socket data length is longer then " + socket.maxLen + ", close it, " + socket.remoteAddress);
                     return;
                 }
-                socket.buffer = Buffer.allocUnsafe(socket.len);
+                if (msg.length - readLen >= socket.len) { // data coming all
+                    socket.emit("data", msg.slice(readLen, readLen + socket.len));
+                    readLen += socket.len;
+                    socket.len = 0;
+                    socket.headLen = 0;
+                } else {
+                    socket.buffer = Buffer.allocUnsafe(socket.len);
+                }
             }
-            readLen++;
         }
         else if (msg.length - readLen < socket.len)	// data not coming all
         {
@@ -41,16 +51,13 @@ export function decode(socket: SocketProxy, msg: Buffer) {
             socket.len -= (msg.length - readLen);
             readLen = msg.length;
         }
-        else {
+        else { // data coming all
             msg.copy(socket.buffer, socket.buffer.length - socket.len, readLen, readLen + socket.len);
-
+            socket.emit("data", socket.buffer);
             readLen += socket.len;
             socket.len = 0;
-            let data = socket.buffer;
-            socket.buffer = Buffer.allocUnsafe(0);
-
-            //data coming all
-            socket.emit("data", data);
+            socket.headLen = 0;
+            socket.buffer = null as any;
         }
     }
 }
@@ -76,8 +83,9 @@ export let some_config = {
 export const enum Rpc_Msg {
     register = 1,           // 注册
     heartbeat = 2,          // 心跳
-    rpcMsg = 3,             // rpc消息
-    closeClient = 4,        // 关闭rpc client
+    closeClient = 3,        // 关闭rpc client
+    rpcMsg = 4,             // rpc消息
+    rpcMsgAwait = 5,        // rpc消息 await形式
 }
 
 
@@ -119,4 +127,5 @@ export interface I_rpcMsg {
 export interface I_rpcTimeout {
     cb: Function;
     time: number;
+    await: boolean;
 }

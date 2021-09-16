@@ -4,44 +4,53 @@ import tcpServer from "./util/tcpServer";
 import { SocketProxy, Rpc_Msg, some_config } from "./util/util";
 import { EventEmitter } from "events";
 
+export interface I_baseConfig {
+    "id": string,
+    "serverType": string,
+    [key: string]: any,
+}
+
 export interface I_RpcServerConfig {
-    "id"?: number | string,
+    "baseConfig": I_baseConfig,
     "port": number,
     "token"?: string,
-    "timeout"?: number,
-    "maxLen"?: number,
-    "heartbeat"?: number,
     "interval"?: number,
+    "noDelay"?: boolean,
 }
 
 export class RpcServer extends EventEmitter implements I_rpc_sc {
     config: I_RpcServerConfig;
     sockets: { [id: string]: RpcServerSocket } = {};
-    rpc: (id: string, cmd: string) => Function = null as any;
-    rpcService: RpcService;
+    rpc: (id: string, serverType: string, file: string, method: string) => Function = null as any;
+    rpcAwait: (id: string, serverType: string, file: string, method: string) => Function = null as any;
     msgHandler: { [file: string]: any };
+    rpcService: RpcService;
     sendCache: boolean = false;
     sendInterval: number = 0;
+    token: string;
     constructor(config: I_RpcServerConfig, msgHandler: { [file: string]: any }) {
         super();
         this.config = config;
         this.msgHandler = msgHandler;
+        this.token = config.token || some_config.token
         if (config.interval && config.interval >= 10) {
             this.sendCache = true;
             this.sendInterval = config.interval;
         }
-        this.rpcService = new RpcService(config.timeout || 0, this);
+        this.rpcService = new RpcService(this);
 
-        tcpServer(config.port
+        let noDelay = config.noDelay === false ? false : true;
+
+        tcpServer(config.port, noDelay
             , () => {
-                getLogger()("info", `rpcUtil_server --> [${this.config.id}] listening at [${config.port}]`);
+                getLogger()("frame", "info", `rpcUtil_server --> [${config.baseConfig.id}] listening at [${config.port}]`);
             }
             , (socket: SocketProxy) => {
                 new RpcServerSocket(this, socket);
             });
     }
 
-    delOne(id: number | string) {
+    delOne(id: string) {
         let one = this.sockets[id];
         if (one) {
             one.close();
@@ -54,7 +63,7 @@ export class RpcServer extends EventEmitter implements I_rpc_sc {
 class RpcServerSocket {
     private rpcServer: RpcServer;
 
-    private id: string = "";
+    baseConfig: I_baseConfig = null as any;
     private socket: SocketProxy;
     private die = false;
 
@@ -64,13 +73,14 @@ class RpcServerSocket {
 
     private registerTimer: NodeJS.Timeout = null as any;
     private heartbeatTimer: NodeJS.Timeout = null as any;
+
     constructor(rpcServer: RpcServer, socket: SocketProxy) {
         this.rpcServer = rpcServer;
         this.socket = socket;
         socket.once("data", this.onRegisterData.bind(this));
         socket.on("close", this.onClose.bind(this));
         this.registerTimer = setTimeout(() => {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] register timeout, close the socket: ${socket.remoteAddress}`);
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] register timeout, close the socket: ${socket.remoteAddress}`);
             socket.close();
         }, 5000);
         this.sendCache = this.rpcServer.sendCache;
@@ -83,12 +93,12 @@ class RpcServerSocket {
             if (type === Rpc_Msg.register) {
                 this.registerHandle(data);
             } else {
-                getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] illegal rpc register, close the socket: ${this.socket.remoteAddress}`);
+                getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] illegal rpc register, close the socket: ${this.socket.remoteAddress}`);
                 this.socket.close();
             }
-        } catch (e) {
+        } catch (e: any) {
             this.socket.close();
-            getLogger()("error", `[${this.rpcServer.config.id}] ` + e.stack);
+            getLogger()("frame", "error", `[${this.rpcServer.config.baseConfig.id}] ` + e.stack);
         }
     }
 
@@ -100,18 +110,21 @@ class RpcServerSocket {
         try {
             let type = data.readUInt8(0);
             if (type === Rpc_Msg.rpcMsg) {
-                this.rpcServer.rpcService.handleMsg(this.id, data);
+                this.rpcServer.rpcService.handleMsg(this.baseConfig.id, data);
+            }
+            else if (type === Rpc_Msg.rpcMsgAwait) {
+                this.rpcServer.rpcService.handleMsgAwait(this.baseConfig.id, data);
             }
             else if (type === Rpc_Msg.heartbeat) {
                 this.heartbeatHandle();
                 this.heartbeatResponse();
             }
             else {
-                getLogger()("error", `rpcUtil_server --> [${this.rpcServer.config.id}] illegal data type, close rpc client named: ${this.id}`);
+                getLogger()("frame", "error", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] illegal data type, close rpc client named: ${this.baseConfig.id}`);
                 this.socket.close();
             }
-        } catch (e) {
-            getLogger()("error", `[${this.rpcServer.config.id}] ` + e.stack);
+        } catch (e: any) {
+            getLogger()("msg", "error", `[${this.rpcServer.config.baseConfig.id}] ` + e.stack);
         }
     }
 
@@ -122,12 +135,16 @@ class RpcServerSocket {
         clearTimeout(this.registerTimer);
         clearTimeout(this.heartbeatTimer);
         clearInterval(this.sendTimer);
-        if (this.rpcServer.sockets[this.id]) {
-            delete this.rpcServer.sockets[this.id];
-            this.rpcServer.emit("onDel", this.id);
+        if (this.baseConfig && this.rpcServer.sockets[this.baseConfig.id]) {
+            delete this.rpcServer.sockets[this.baseConfig.id];
+            this.rpcServer.emit("onDel", this.baseConfig);
         }
         if (!this.die) {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] a rpc client disconnected: ${this.id}, ${this.socket.remoteAddress}`);
+            let id = "";
+            if (this.baseConfig) {
+                id = this.baseConfig.id
+            }
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] a rpc client disconnected: ${id}, ${this.socket.remoteAddress}`);
         }
     }
 
@@ -136,46 +153,48 @@ class RpcServerSocket {
      */
     private registerHandle(msg: Buffer) {
         clearTimeout(this.registerTimer);
-        let data: { "id": string, "token": string };
+        this.registerTimer = null as any;
+
+        let data: { "baseConfig": I_baseConfig, "token": string };
         try {
             data = JSON.parse(msg.slice(1).toString());
         } catch (err) {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] JSON parse error，close the rpc socket: ${this.socket.remoteAddress}`);
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] JSON parse error，close the rpc socket: ${this.socket.remoteAddress}`);
             this.socket.close();
             return;
         }
-        let token = this.rpcServer.config.token || some_config.token;
-        if (!data.id || data.token !== token) {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] illegal token, close the rpc socket: ${this.socket.remoteAddress}`);
+        if (!data || !data.baseConfig || !data.baseConfig.id || !data.baseConfig.serverType || data.token !== this.rpcServer.token) {
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] illegal token, close the rpc socket: ${this.socket.remoteAddress}`);
             this.socket.close();
             return;
         }
-        if (this.rpcServer.sockets[data.id]) {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] already has a rpc client named: ${data.id}, close it, ${this.socket.remoteAddress}`);
+        if (this.rpcServer.sockets[data.baseConfig.id]) {
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] already has a rpc client named: ${data.baseConfig.id}, close it, ${this.socket.remoteAddress}`);
             this.socket.close();
             return;
         }
-        this.socket.maxLen = this.rpcServer.config.maxLen || some_config.SocketBufferMaxLen;
+        this.socket.maxLen = some_config.SocketBufferMaxLen;
         this.socket.on("data", this.onData.bind(this));
 
-        this.id = data.id;
-        this.rpcServer.sockets[this.id] = this;
-        this.registerTimer = null as any;
+        this.baseConfig = data.baseConfig;
+        this.rpcServer.sockets[this.baseConfig.id] = this;
 
         if (this.sendCache) {
             this.sendTimer = setInterval(this.sendInterval.bind(this), this.rpcServer.sendInterval);
         }
 
-        getLogger()("info", `rpcUtil_server --> [${this.rpcServer.config.id}] get new rpc client named: ${this.id}`);
+        getLogger()("frame", "info", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] get new rpc client named: ${this.baseConfig.id}`);
 
         // 注册成功，回应
-        let buffer = Buffer.allocUnsafe(5);
-        buffer.writeUInt32BE(1, 0);
-        buffer.writeUInt8(Rpc_Msg.register, 4);
-        this.socket.send(buffer);
+        let registerBackBuf = Buffer.from(JSON.stringify({ "baseConfig": this.rpcServer.config.baseConfig, "heartbeat": some_config.Time.Rpc_Heart_Beat_Time }));
+        let buf = Buffer.allocUnsafe(registerBackBuf.length + 5);
+        buf.writeUInt32BE(registerBackBuf.length + 1, 0);
+        buf.writeUInt8(Rpc_Msg.register, 4);
+        registerBackBuf.copy(buf, 5);
+        this.socket.send(buf);
         this.heartbeatHandle();
 
-        this.rpcServer.emit("onAdd", this.id);
+        this.rpcServer.emit("onAdd", this.baseConfig);
     }
 
     /**
@@ -183,14 +202,10 @@ class RpcServerSocket {
      */
     private heartbeatHandle() {
         clearTimeout(this.heartbeatTimer);
-        let heartbeat = this.rpcServer.config.heartbeat || some_config.Time.Rpc_Heart_Beat_Time;
-        if (heartbeat < 5) {
-            heartbeat = 5;
-        }
         this.heartbeatTimer = setTimeout(() => {
-            getLogger()("warn", `rpcUtil_server --> [${this.rpcServer.config.id}] heartbeat timeout, close it: ${this.id}`);
+            getLogger()("frame", "warn", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] heartbeat timeout, close it: ${this.baseConfig.id}`);
             this.socket.close();
-        }, heartbeat * 1000 * 2);
+        }, some_config.Time.Rpc_Heart_Beat_Time * 1000 * 2);
     }
 
     /**
@@ -225,6 +240,6 @@ class RpcServerSocket {
         buffer.writeUInt8(Rpc_Msg.closeClient, 4);
         this.socket.send(buffer);
         this.socket.close();
-        getLogger()("info", `rpcUtil_server --> [${this.rpcServer.config.id}] rpc socket be closed ok [${this.id}]`);
+        getLogger()("frame", "info", `rpcUtil_server --> [${this.rpcServer.config.baseConfig.id}] rpc socket be closed ok [${this.baseConfig.id}]`);
     }
 }

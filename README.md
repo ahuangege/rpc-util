@@ -1,5 +1,6 @@
 # rpc-util
-a typescript rpc framework
+a typescript rpc framework  
+能够智能参数提示
 
 # install
 `npm install rpc-util`
@@ -7,35 +8,48 @@ a typescript rpc framework
 # usage
 
 ```
-import * as rpcUtl from "rpc-util";
+import * as rpcUtil from "rpc-util"
 
-class ServerHandler {
-    test(a: number, b: string, cb: (err: number, data: any) => void) {
-        console.log("server---", a, b);
-        cb(0, { "msg": "hello world" });
+/** 声明提示，开发时应放到一个文件中，不同项目进行共享。声明和服务器消息处理器需要保持一致 */
+declare global {
+    interface RpcUtil {
+        serverType_gate: {
+            file_main: {
+                method_test: (a: number, b: string, cb: (err: number, num: number) => void) => void;
+                method_testAwait: (a: number, b: string) => number;
+            }
+        }
     }
 }
-class ClientHandler {
-    test(msg: string) {
-        console.log("client---", msg);
-    }
-}
 
-rpcUtl.setLogger((level, msg) => {
-    console.log(" *** ", level, msg)
+/** 日志回调 */
+rpcUtil.setLogger((level, msg) => {
+    console.log(level, msg);
 });
 
-let server = rpcUtl.rpcServer({ "id": "hallSvr", "port": 3001 }, { "mainSvr": new ServerHandler() });
-let client = rpcUtl.rpcClient({ "id": "gameSvr1", "serverList": [{ "id": "hallSvr", "host": "127.0.0.1", "port": 3001 }] }, { "mainClient": new ClientHandler() });
+/** 服务器启动 */
+class A implements Required<RpcUtil["serverType_gate"]["file_main"]>{
+    method_test(a: number, b: string, cb: (err: number, num: number) => void) {
+        console.log("method_test", a, b);
+        cb && cb(0, 123);
+    }
 
-setTimeout(Test, 1000);
+    method_testAwait(a: number, b: string) {
+        console.log("method_testAwait", a, b);
+        return 111;
+    }
+}
+rpcUtil.rpcServer({ "baseConfig": { "id": "gateSvr", "serverType": "serverType_gate" }, "port": 3002 }, { "file_main": new A() });
 
-function Test() {
-
-    client.rpc("hallSvr", "mainSvr.test")(123, "hello", (err: number, data: any) => {
-        console.log("back", err, data);
+/** 客户端调用测试 */
+let client = rpcUtil.rpcClient({ "baseConfig": { "id": "client1", "serverType": "client" }, "serverList": [{ "host": "127.0.0.1", "port": 3002 }] }, {});
+setTimeout(async () => {
+    client.rpc("gateSvr", "serverType_gate", "file_main", "method_test")(666, "hello", (err, num) => {
+        console.log("rpc back", err, num)
     });
 
-    server.rpc("gameSvr1", "mainClient.test")("haha");
-}
+    let res = await client.rpcAwait("gateSvr", "serverType_gate", "file_main", "method_testAwait")(555, "world");
+    console.log("rpcAwait back", res)
+}, 1000)
+
 ```

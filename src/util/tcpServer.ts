@@ -10,9 +10,9 @@ import { decode } from "./util";
 import { some_config } from "./util";
 
 
-export default function tcpServer(port: number, startCb: () => void, newClientCb: (socket: SocketProxy) => void) {
+export default function tcpServer(port: number, noDelay: boolean, startCb: () => void, newClientCb: (socket: SocketProxy) => void) {
     let svr = net.createServer(function (socket) {
-        socket.setNoDelay(true);
+        socket.setNoDelay(noDelay);
         newClientCb(new NetSocket(socket));
     }).listen(port, startCb);
 
@@ -29,7 +29,9 @@ class NetSocket extends EventEmitter implements SocketProxy {
     socket: net.Socket;
     maxLen: number;
     len: number = 0;
-    buffer: Buffer = Buffer.allocUnsafe(0);
+    buffer: Buffer = null as any;
+    headLen = 0;
+    headBuf = Buffer.alloc(4);
     constructor(socket: net.Socket) {
         super();
         this.socket = socket;

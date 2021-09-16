@@ -1,8 +1,8 @@
 {
   "_from": "rpc-util",
-  "_id": "rpc-util@1.0.1",
+  "_id": "rpc-util@1.0.2",
   "_inBundle": false,
-  "_integrity": "sha512-OtpdJ2bwkcQyYrwFmY/CyFs+bdSWCuDdocjg34jtE96kZvfhVmmDErkIJ7f9HaPd5zeUfRk68BTQq9rzHCv42w==",
+  "_integrity": "sha512-+mDr5yVugog62z5yK3TO3B7YcKOUDJ4K0K+MwRf4bTrAqfePFOfg/0/l2sFikGQvOQR9WVS2fN0OI0ninjJImQ==",
   "_location": "/rpc-util",
   "_phantomChildren": {},
   "_requested": {
@@ -19,10 +19,10 @@
     "#USER",
     "/"
   ],
-  "_resolved": "https://registry.npmjs.org/rpc-util/-/rpc-util-1.0.1.tgz",
-  "_shasum": "47cce32d07de466f3abe18f68c60fffa413ff088",
+  "_resolved": "https://registry.npmjs.org/rpc-util/-/rpc-util-1.0.2.tgz",
+  "_shasum": "6ce49966ddd9ddacbb7cf6f45afe79c67456996d",
   "_spec": "rpc-util",
-  "_where": "D:\\nodejs\\test",
+  "_where": "D:\\nodejs\\rpc_util",
   "author": {
     "name": "ahuang"
   },
@@ -41,6 +41,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "types": "index.d.ts",
-  "version": "1.0.2"
+  "types": "rpc_util.d.ts",
+  "version": "1.1.1"
 }

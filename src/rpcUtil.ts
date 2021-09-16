@@ -1,10 +1,10 @@
 import { I_RpcClientConfig, RpcClient } from "./rpcClient";
 import { I_RpcServerConfig, RpcServer } from "./rpcServer";
 
-let logCb: (level: "info" | "warn" | "error", msg: string) => void = function () {
+let logCb: (type: "msg" | "frame", level: "info" | "warn" | "error", msg: string) => void = function () {
 
 }
-export function setLogger(cb: (level: "info" | "warn" | "error", msg: string) => void) {
+export function setLogger(cb: (type: "msg" | "frame", level: "info" | "warn" | "error", msg: string) => void) {
     logCb = cb;
 }
 
