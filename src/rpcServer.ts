@@ -21,8 +21,8 @@ export interface I_RpcServerConfig {
 export class RpcServer extends EventEmitter implements I_rpc_sc {
     config: I_RpcServerConfig;
     sockets: { [id: string]: RpcServerSocket } = {};
-    rpc: (id: string, serverType: string, file: string, method: string) => Function = null as any;
-    rpcAwait: (id: string, serverType: string, file: string, method: string) => Function = null as any;
+    rpc: (id: string) => RpcUtil = null as any;
+    rpcAwait: (id: string, notify?: boolean) => RpcUtil = null as any;
     msgHandler: { [file: string]: any };
     rpcService: RpcService;
     sendCache: boolean = false;
@@ -57,6 +57,9 @@ export class RpcServer extends EventEmitter implements I_rpc_sc {
         }
     }
 
+    hasSocket(id: string) {
+        return !!this.sockets[id];
+    }
 }
 
 

@@ -1,8 +1,8 @@
 {
   "_from": "rpc-util",
-  "_id": "rpc-util@1.0.2",
+  "_id": "rpc-util@1.1.1",
   "_inBundle": false,
-  "_integrity": "sha512-+mDr5yVugog62z5yK3TO3B7YcKOUDJ4K0K+MwRf4bTrAqfePFOfg/0/l2sFikGQvOQR9WVS2fN0OI0ninjJImQ==",
+  "_integrity": "sha512-09IM2WwsxZzkdoXdQboh0krnhWXRnivAgKdEXTO5w4nTALV0yvOE0YEvtwJjEoPDuP/OC2nCjFHGe8z+Xp1ZqA==",
   "_location": "/rpc-util",
   "_phantomChildren": {},
   "_requested": {
@@ -19,8 +19,8 @@
     "#USER",
     "/"
   ],
-  "_resolved": "https://registry.npmjs.org/rpc-util/-/rpc-util-1.0.2.tgz",
-  "_shasum": "6ce49966ddd9ddacbb7cf6f45afe79c67456996d",
+  "_resolved": "https://registry.npmjs.org/rpc-util/-/rpc-util-1.1.1.tgz",
+  "_shasum": "f4f3c83ad1db379fcbcc06e1ec0b4c3b8768b3ca",
   "_spec": "rpc-util",
   "_where": "D:\\nodejs\\rpc_util",
   "author": {

@@ -29,15 +29,16 @@ interface I_rpcUtil_serverConfig {
 }
 
 interface I_rpcUtil_server {
-    rpc: rpcFunc;
-    rpcAwait: rpcFunc;
+    rpc: (id: string) => RpcUtil;
+    rpcAwait: (id: string, notify?: boolean) => RpcUtil;
     delOne(id: string): void;
+    hasSocket(id: string): boolean;
     on(event: "onAdd" | "onDel", listener: (info: I_baseConfig) => void);
 }
 
 interface I_rpcUtil_clientConfig {
     "baseConfig": I_baseConfig,
-    "serverList": { "host": string, "port": number, "token"?: string, [key: string]: any }[],
+    "serverList": { "idTmp": string, "host": string, "port": number, "token"?: string, [key: string]: any }[],
     /** message sending frequency (ms, more than 10 is enabled, the default is to send immediately) */
     "interval"?: number,
     /** whether to enable Nagle algorithm (not enabled by default) */
@@ -45,10 +46,12 @@ interface I_rpcUtil_clientConfig {
 }
 
 interface I_rpcUtil_client {
-    rpc: rpcFunc;
-    rpcAwait: rpcFunc;
-    addOne(server: { "host": string, "port": number, "token"?: string, [key: string]: any }): void;
-    delOne(id: string): void;
+    rpc: (id: string) => RpcUtil;
+    rpcAwait: (id: string, notify?: boolean) => RpcUtil;
+    addOne(server: { "idTmp": string, "host": string, "port": number, "token"?: string, [key: string]: any }): void;
+    delOne(idTmp: string): void;
+    hasSocket(idTmp: string): boolean;
+    isSocketAlive(idTmp: string): boolean;
     on(event: "onAdd" | "onDel", listener: (info: I_baseConfig) => void);
 }
 
@@ -59,4 +62,3 @@ declare global {
     interface RpcUtil {
     }
 }
-type rpcFunc = <T extends keyof RpcUtil, K extends keyof RpcUtil[T], J extends keyof RpcUtil[T][K]>(id: string, serverType: T, file: K, method: J) => RpcUtil[T][K][J]

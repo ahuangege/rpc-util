@@ -19,3 +19,11 @@ export function rpcClient(config: I_RpcClientConfig, msgHandler: { [file: string
 export function getLogger() {
     return logCb;
 }
+
+/**
+ * RpcUtil
+ */
+ declare global {
+    interface RpcUtil {
+    }
+}

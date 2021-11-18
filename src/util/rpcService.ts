@@ -4,8 +4,8 @@ import { I_baseConfig } from "../rpcServer";
 
 export interface I_rpc_sc {
     sockets: { [id: string]: { "send": (data: Buffer) => void, "baseConfig": I_baseConfig } };
-    rpc: (id: string, serverType: string, file: string, method: string) => Function;
-    rpcAwait: (id: string, serverType: string, file: string, method: string, notify?: boolean) => Function;
+    rpc: (id: string) => RpcUtil;
+    rpcAwait: (id: string, notify?: boolean) => RpcUtil;
     msgHandler: { [file: string]: any };
 }
 
@@ -21,6 +21,11 @@ export class RpcService {
     private rpcTimeMax: number = 10 * 1000; //超时时间
     private outTime = 0;    // 当前时刻 + 超时时间
 
+    private toId: string = "";
+    private notify: boolean = false;
+    private rpcObj: RpcUtil = null as any;
+    private rpcObjAwait: RpcUtil = null as any;
+
 
     constructor(rpcSc: I_rpc_sc) {
         this.outTime = Date.now() + this.rpcTimeMax;
@@ -32,27 +37,94 @@ export class RpcService {
         this.rpcSc = rpcSc;
         this.rpcSc.rpc = this.rpcFunc.bind(this);
         this.rpcSc.rpcAwait = this.rpcFuncAwait.bind(this);
+
+        let self = this;
+        this.rpcObj = new Proxy({}, {
+            get(_serverTypeDic: any, serverType: string) {
+                let fileDic = _serverTypeDic[serverType];
+                if (!fileDic) {
+                    fileDic = new Proxy({}, {
+                        get(_fileDic: any, file: string) {
+                            let methodDic = _fileDic[file];
+                            if (!methodDic) {
+                                methodDic = new Proxy({}, {
+                                    get(_methodDic: any, method: string) {
+                                        let func = _methodDic[method];
+                                        if (!func) {
+                                            func = self.rpcFuncProxy(serverType, file + "." + method);
+                                            _methodDic[method] = func;
+                                        }
+                                        return func;
+                                    }
+                                });
+                                _fileDic[file] = methodDic
+                            }
+                            return methodDic;
+                        }
+                    });
+                    _serverTypeDic[serverType] = fileDic;
+                }
+                return fileDic;
+            }
+        });
+        this.rpcObjAwait = new Proxy({}, {
+            get(_serverTypeDic: any, serverType: string) {
+                let fileDic = _serverTypeDic[serverType];
+                if (!fileDic) {
+                    fileDic = new Proxy({}, {
+                        get(_fileDic: any, file: string) {
+                            let methodDic = _fileDic[file];
+                            if (!methodDic) {
+                                methodDic = new Proxy({}, {
+                                    get(_methodDic: any, method: string) {
+                                        let func = _methodDic[method];
+                                        if (!func) {
+                                            func = self.rpcFuncAwaitProxy(serverType, file + "." + method);
+                                            _methodDic[method] = func;
+                                        }
+                                        return func;
+                                    }
+                                });
+                                _fileDic[file] = methodDic
+                            }
+                            return methodDic;
+                        }
+                    });
+                    _serverTypeDic[serverType] = fileDic;
+                }
+                return fileDic;
+            }
+        });
+
     }
 
-    private rpcFunc(id: string, serverT: string, file: string, method: string) {
+    private rpcFunc(serverId: string) {
+        this.toId = serverId;
+        return this.rpcObj;
+    }
+    private rpcFuncAwait(serverId: string, notify = false) {
+        this.toId = serverId;
+        this.notify = notify;
+        return this.rpcObjAwait;
+    }
+    private rpcFuncProxy(serverT: string, file_method: string) {
         let self = this;
         let func = function (...args: any[]) {
-            if (id === "*") {
-                self.sendT(serverT, file + "." + method, args);
+            if (self.toId === "*") {
+                self.sendT(serverT, file_method, args);
             } else {
-                self.send(id, file + "." + method, args);
+                self.send(self.toId, file_method, args);
             }
         }
         return func;
     }
-
-    private rpcFuncAwait(id: string, serverT: string, file: string, method: string, notify = false) {
+    private rpcFuncAwaitProxy(serverT: string, file_method: string) {
         let self = this;
         let func = function (...args: any[]): Promise<any> | undefined {
-            if (id === "*") {
-                return self.sendTAwait(serverT, file + "." + method, args);
+            if (self.toId === "*") {
+                return self.sendTAwait(serverT, file_method, args);
             } else {
-                return self.sendAwait(id, notify, file + "." + method, args);
+                return self.sendAwait(self.toId, self.notify, file_method, args);
             }
         }
         return func;
