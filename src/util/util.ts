@@ -36,7 +36,7 @@ export function decode(socket: SocketProxy, msg: Buffer) {
                     return;
                 }
                 if (msg.length - readLen >= socket.len) { // data coming all
-                    socket.emit("data", msg.slice(readLen, readLen + socket.len));
+                    socket.emit("data", msg.subarray(readLen, readLen + socket.len));
                     readLen += socket.len;
                     socket.len = 0;
                     socket.headLen = 0;
@@ -89,43 +89,26 @@ export const enum Rpc_Msg {
 }
 
 
-/**
- * rpc调用，内部错误码
- */
-export const enum rpcErr {
-    /**
-     * 没有错误
-     */
-    ok = 0,
-    /**
-     * 没有目标服务器
-     */
-    noServer = 1,
-    /**
-     * rpc超时
-     */
-    timeout = 2
-}
-
 
 /**
  * rpc消息导向包
- * 1、有cmd有id表示收到消息且需回调
- * 2、有cmd无id表示收到消息无需回调
- * 3、无cmd有id表示是回调的消息
- * 4、len表示最后一个Buffer参数的长度
+ * 1、有f有id表示收到消息且需回调
+ * 2、有f无id表示收到消息无需回调
+ * 3、无f有id表示是回调的消息
  */
 export interface I_rpcMsg {
-    cmd?: string;
+    f?: string;
+    m?: string;
     id?: number;
-    len?: number;
 }
 
 /**
  * rpc请求超时
  */
 export interface I_rpcTimeout {
+    id: number;
     cb: Function;
     time: number;
     await: boolean;
 }
+

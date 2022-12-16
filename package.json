@@ -1,32 +1,12 @@
 {
-  "_from": "rpc-util",
-  "_id": "rpc-util@1.1.1",
-  "_inBundle": false,
-  "_integrity": "sha512-09IM2WwsxZzkdoXdQboh0krnhWXRnivAgKdEXTO5w4nTALV0yvOE0YEvtwJjEoPDuP/OC2nCjFHGe8z+Xp1ZqA==",
-  "_location": "/rpc-util",
-  "_phantomChildren": {},
-  "_requested": {
-    "type": "tag",
-    "registry": true,
-    "raw": "rpc-util",
-    "name": "rpc-util",
-    "escapedName": "rpc-util",
-    "rawSpec": "",
-    "saveSpec": null,
-    "fetchSpec": "latest"
-  },
-  "_requiredBy": [
-    "#USER",
-    "/"
-  ],
-  "_resolved": "https://registry.npmjs.org/rpc-util/-/rpc-util-1.1.1.tgz",
-  "_shasum": "f4f3c83ad1db379fcbcc06e1ec0b4c3b8768b3ca",
-  "_spec": "rpc-util",
-  "_where": "D:\\nodejs\\rpc_util",
+  "name": "rpc-util",
+  "version": "1.3.0",
   "author": {
     "name": "ahuang"
   },
-  "bundleDependencies": false,
+  "main": "dist/rpcUtil.js",
+  "types": "rpc-util.d.ts",
+  "bundleDependencies": [],
   "deprecated": false,
   "description": "a typescript rpc framework",
   "homepage": "https://github.com/ahuangege/rpc-util",
@@ -36,11 +16,10 @@
     "typescript"
   ],
   "license": "ISC",
-  "main": "dist/rpcUtil.js",
-  "name": "rpc-util",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "types": "rpc_util.d.ts",
-  "version": "1.2.0"
+  "dependencies": {
+    "@types/node": "^18.11.14"
+  }
 }
